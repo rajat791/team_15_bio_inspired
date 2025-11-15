@@ -47,13 +47,13 @@ def setup(config):
     # 0 = unburned
     # 1 = burning
     # 2 = burned out
-    config.states = (0, 1, 2, 3)
+    config.states = (0, 1, 2)
 
     # Grid size (you can change later)
-    config.grid_dims = (50, 50)
+    config.grid_dims = (100, 100)
 
     # Number of timesteps to simulate
-    config.num_generations = 200
+    config.num_generations = 300
 
     # Colors for each state
     config.state_colors = [
@@ -62,14 +62,83 @@ def setup(config):
         (0.2, 0.2, 0.2)   # burned out - dark gray
     ]
 
-    # Create empty grid
-    grid = np.zeros(config.grid_dims, dtype=int)
-
-    # Start a fire in the middle
     rows, cols = config.grid_dims
-    grid[rows//2, cols//2] = 1  # initial burning cell
+    
+    # Create empty grid
+    terrain = np.zeros((rows, cols), dtype=int)
+    
+    # Terrain codes:
+    # 0 = lake
+    # 1 = chaparral (default background)
+    # 2 = dense forest
+    # 3 = canyon scrubland (highly flammable)
+    # 4 = town
+    
+    # Fill entire map with chaparral
+    terrain[:, :] = 1
 
-    config.initial_grid = grid
+    # Helper scaling factor:
+    # Each square in the assignment diagram = 2.5km = 5 cells
+    sq = 5
+
+    # ---------------------------------------------------------
+    # FOREST BLOCKS (dark green in figure)
+    # ---------------------------------------------------------
+
+    # Left L-shaped forest
+    terrain[sq*4 : sq*12, sq*2 : sq*6] = 2
+    terrain[sq*4 : sq*6, sq*6 : sq*10] = 2
+
+    # Lower-left forest block
+    terrain[sq*8 : sq*14, sq*2 : sq*12] = 2
+
+    # Right vertical forest strip
+    terrain[sq*4 : sq*12, sq*14 : sq*15] = 2
+
+    # ---------------------------------------------------------
+    # LAKES (light blue rectangles)
+    # ---------------------------------------------------------
+    # Upper horizontal lake
+    terrain[sq*7 : sq*8, sq*10 : sq*14] = 0
+
+    # Lower horizontal lake
+    terrain[sq*12 : sq*13, sq*6 : sq*16] = 0
+
+    # Vertical lake (middle)
+    terrain[sq*7 : sq*13, sq*12 : sq*13] = 0
+
+    # ---------------------------------------------------------
+    # CANYON (highly flammable scrubland)
+    # ---------------------------------------------------------
+    terrain[sq*5 : sq*16, sq*16 : sq*17] = 3
+
+    # ---------------------------------------------------------
+    # TOWN (small 2.5km × 2.5km black square)
+    # ---------------------------------------------------------
+    terrain[sq*1 : sq*2, sq*4 : sq*5] = 4
+
+    # ---------------------------------------------------------
+    # Ignition points (NO fire placed yet)
+    # ---------------------------------------------------------
+    # Power plant (top-left X)
+    power_plant = (sq*19, sq*1)
+
+    # Incinerator (top-right X)
+    incinerator = (sq*19, sq*19)
+
+    # ---------------------------------------------------------
+    # FIRE GRID (dynamic)
+    # ---------------------------------------------------------
+    fire = np.zeros((rows, cols), dtype=int)
+
+    # Start fire at power plant initially
+    fire[power_plant] = 1
+
+    # Attach everything to the config
+    config.initial_grid = fire
+    config.terrain_grid = terrain
+    config.power_plant = power_plant
+    config.incinerator = incinerator
 
 
 # ---------------------------------------------------------
