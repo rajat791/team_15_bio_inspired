@@ -3,6 +3,32 @@ import sys
 from capyle.ca import Grid2D, CAConfig
 
 # ---------------------------------------------------------
+# TERRAIN PARAMETERS
+# ---------------------------------------------------------
+
+# Terrain codes:
+# 0 = lake (non burnable)
+# 1 = dense forest
+# 2 = chaparral
+# 3 = canyon
+# 4 = town
+
+terrain_ignite_probs = {
+    1: 0.2,   # dense forest does not ignite easily
+    2: 0.70,   # chaparral ignites easily
+    3: 0.90,   # canyon burns easily
+    4: 0.75,   # buildings
+}
+
+terrain_burn_times = {
+    1: 20,     # forest burns slowly
+    2: 6,     # chaparral burns several days
+    3: 2,    # canyon burns quickly
+    4: 4,    # town burns moderately
+}
+
+
+# ---------------------------------------------------------
 # SETUP FUNCTION
 # ---------------------------------------------------------
 def setup(config):
@@ -21,7 +47,7 @@ def setup(config):
     # 0 = unburned
     # 1 = burning
     # 2 = burned out
-    config.states = (0, 1, 2)
+    config.states = (0, 1, 2, 3)
 
     # Grid size (you can change later)
     config.grid_dims = (50, 50)
