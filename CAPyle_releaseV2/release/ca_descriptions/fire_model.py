@@ -165,6 +165,10 @@ def transition_function(grid, neighbourstates, neighbourcounts):
                     elif config.wind_direction == "N" and dr < 0:
                         spread_prob += 0.3
 
+                # Lower the probability of spread if the neighbor is in a canyon and this tile is on the mainland
+                if terrain[nr, nc] == 3 and terrain[br, bc] != 3:
+                    spread_prob *= 0.0002
+
                 # Attempt to ignite neighbor
                 if np.random.rand() < spread_prob:
                     new_fire[nr, nc] = 5
