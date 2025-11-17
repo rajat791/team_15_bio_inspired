@@ -108,7 +108,7 @@ def transition_function(grid, neighbourstates, neighbourcounts):
     fire = config.fire_grid
     new_fire = fire.copy()
 
-    # Spread probability per terrain type
+    # Fire spread probability per terrain type
     ignite_prob = {
         1: 0.45,   # chaparral
         2: 0.04,   # forest
@@ -124,6 +124,13 @@ def transition_function(grid, neighbourstates, neighbourcounts):
         2: 60,
         3: 10,
         4: 40,
+    }
+
+    # Vegetation regrowth probability per terrain type
+    veg_spread_prob = {
+        1: 0.02,
+        2: 0.0002,
+        3: 0.02
     }
 
     rows, cols = fire.shape
@@ -165,14 +172,47 @@ def transition_function(grid, neighbourstates, neighbourcounts):
                     elif config.wind_direction == "N" and dr < 0:
                         spread_prob += 0.3
 
-                # Lower the probability of spread if the neighbor is in a canyon and this tile is on the mainland
-                if terrain[nr, nc] == 3 and terrain[br, bc] != 3:
+                if config.initial_grid[nr, nc] == 3 and config.initial_grid[br, bc] != 3:
+                    # Lower the probability of spread if the neighbor is in a canyon and this tile is on the mainland
                     spread_prob *= 0.0002
+                else:
+                    # Humidity is higher near lakes, reducing the fire spread probability
+                    humidity_factor = 0
+                    surrounds = [(sr, sc) for sr in [-1,0,1] for sc in [-1,0,1] if not (sr==0 and sc==0)]
+                    for sr, sc in surrounds:
+                        r, c = sr + nr, sc + nc
+                        if 0 <= r < rows and 0 <= c < cols and terrain[r, c] == 0:
+                            humidity_factor += 1
+                    if humidity_factor >= 3:
+                        spread_prob *= 0.0002
+                    else:
+                        spread_prob /= (1+humidity_factor)
 
                 # Attempt to ignite neighbor
                 if np.random.rand() < spread_prob:
                     new_fire[nr, nc] = 5
                     burn_time[nr, nc] = burn_duration.get(terr, 15)
+
+    # Spread vegetation
+    veg_cells = np.where((terrain >= 1) ^ (terrain > 3))
+    for br, bc in zip(veg_cells[0], veg_cells[1]):
+        # Get all 8 neighbors
+        neighbors = [(dr, dc) for dr in [-1,0,1] for dc in [-1,0,1] if not (dr==0 and dc==0)]
+        for dr, dc in neighbors:
+            nr, nc = br + dr, bc + dc
+            if 0 <= nr < rows and 0 <= nc < cols:
+                # Attempt to spread vegetation into the burned area
+                if terrain[nr, nc] == 6 and np.random.rand() < veg_spread_prob.get(terrain[br,bc], 0):
+                    # Prohibit spread of vegetation across the canyon border
+                    moving_into_canyon = terrain[br,bc] != 3 and config.initial_grid[nr, nc] == 3
+                    moving_out_canyon = terrain[br,bc] == 3 and config.initial_grid[nr, nc] != 3
+                    if moving_into_canyon or moving_out_canyon:
+                        continue
+
+                    # Spread the vegetation into the burned area
+                    terrain[nr, nc] = terrain[br, bc]
+                    new_fire[nr, nc] = 0
+                    burn_time[nr, nc] = 0
 
     # -----------------------------
     # Update visual grid
@@ -181,6 +221,7 @@ def transition_function(grid, neighbourstates, neighbourcounts):
     out[new_fire == 5] = 5
     out[new_fire == 6] = 6
     config.fire_grid = new_fire
+    config.terrain_grid = out
 
     return out
 
