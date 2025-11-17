@@ -128,9 +128,9 @@ def transition_function(grid, neighbourstates, neighbourcounts):
 
     # Vegetation regrowth probability per terrain type
     veg_spread_prob = {
-        1: 0.02,
+        1: 0.01,
         2: 0.0002,
-        3: 0.02
+        3: 0.01
     }
 
     rows, cols = fire.shape
@@ -184,7 +184,7 @@ def transition_function(grid, neighbourstates, neighbourcounts):
                         if 0 <= r < rows and 0 <= c < cols and terrain[r, c] == 0:
                             humidity_factor += 1
                     if humidity_factor >= 3:
-                        spread_prob *= 0.0002
+                        spread_prob *= 0.005
                     else:
                         spread_prob /= (1+humidity_factor)
 
