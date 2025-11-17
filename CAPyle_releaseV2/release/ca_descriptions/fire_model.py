@@ -1,195 +1,194 @@
-import numpy as np
+# Name: Forest Fire Model
+# Dimensions: 2
+
 import sys
-from capyle.ca import Grid2D, CAConfig
+import inspect
+import numpy as np
+global config
 
-# ---------------------------------------------------------
-# TERRAIN PARAMETERS
-# ---------------------------------------------------------
+# --- CAPyle path setup (do not modify) ---
+this_file_loc = (inspect.stack()[0][1])
+main_dir_loc = this_file_loc[:this_file_loc.index('ca_descriptions')]
+sys.path.append(main_dir_loc)
+sys.path.append(main_dir_loc + 'capyle')
+sys.path.append(main_dir_loc + 'capyle/ca')
+sys.path.append(main_dir_loc + 'capyle/guicomponents')
+# -----------------------------------------
 
-# Terrain codes:
-# 0 = lake (non burnable)
-# 1 = dense forest
-# 2 = chaparral
-# 3 = canyon
-# 4 = town
+from capyle.ca import Grid2D
+import capyle.utils as utils
 
-terrain_ignite_probs = {
-    1: 0.2,   # dense forest does not ignite easily
-    2: 0.70,   # chaparral ignites easily
-    3: 0.90,   # canyon burns easily
-    4: 0.75,   # buildings
-}
-
-terrain_burn_times = {
-    1: 20,     # forest burns slowly
-    2: 6,     # chaparral burns several days
-    3: 2,    # canyon burns quickly
-    4: 4,    # town burns moderately
-}
-
-
-# ---------------------------------------------------------
-# SETUP FUNCTION
-# ---------------------------------------------------------
-def setup(config):
-    """
-    This function defines:
-    - grid size
-    - number of generations
-    - states used
-    - initial conditions
-    """
-
-    config.title = "Basic Forest Fire Model"
+def setup(args):
+    global config
+    config_path = args[0]
+    config = utils.load(config_path)
+    config.title = "Forest Fire Model – Assignment Map"
     config.dimensions = 2
-
-    # State meanings:
-    # 0 = unburned
-    # 1 = burning
-    # 2 = burned out
-    config.states = (0, 1, 2)
-
-    # Grid size (you can change later)
-    config.grid_dims = (100, 100)
-
-    # Number of timesteps to simulate
+    config.states = (0, 1, 2, 3, 4, 5, 6)
+    config.grid_dims = (200, 200)
     config.num_generations = 300
 
-    # Colors for each state
+    # Colours
     config.state_colors = [
-        (0.1, 0.6, 0.1),  # unburned - green
-        (1, 0, 0),        # burning - red
-        (0.2, 0.2, 0.2)   # burned out - dark gray
+        (0.2, 0.4, 1.0),  # 0 lake
+        (0.95, 0.9, 0.3), # 1 chaparral
+        (0.0, 0.3, 0.0),  # 2 forest
+        (1.0, 1.0, 0.1),  # 3 canyon
+        (0.0, 0.0, 0.0),  # 4 town
+        (1.0, 0.0, 0.0),  # 5 burning
+        (0.4, 0.4, 0.4)   # 6 burned
     ]
 
+    # Wind
+    config.wind_direction = "W"
+    config.wind_strength = 5.0
+
+    # ============================================================
+    # TERRAIN GRID
+    # ============================================================
     rows, cols = config.grid_dims
-    
-    # Create empty grid
     terrain = np.zeros((rows, cols), dtype=int)
-    
-    # Terrain codes:
-    # 0 = lake
-    # 1 = chaparral (default background)
-    # 2 = dense forest
-    # 3 = canyon scrubland (highly flammable)
-    # 4 = town
-    
-    # Fill entire map with chaparral
-    terrain[:, :] = 1
+    terrain[:, :] = 1  # default chaparral
 
-    # Helper scaling factor:
-    # Each square in the assignment diagram = 2.5km = 5 cells
-    sq = 5
+    # Town
+    terrain[180:190, 55:65] = 4
 
-    # ---------------------------------------------------------
-    # FOREST BLOCKS (dark green in figure)
-    # ---------------------------------------------------------
+    # Lakes
+    terrain[160:170, 100:160] = 0
+    terrain[40:80, 70:80] = 0
 
-    # Left L-shaped forest
-    terrain[sq*4 : sq*12, sq*2 : sq*6] = 2
-    terrain[sq*4 : sq*6, sq*6 : sq*10] = 2
+    # Canyon
+    terrain[40:130, 140:150] = 3
 
-    # Lower-left forest block
-    terrain[sq*8 : sq*14, sq*2 : sq*12] = 2
+    # Forest blocks
+    terrain[20:100, 20:50] = 2
+    terrain[100:140, 20:100] = 2
+    terrain[20:30, 50:80] = 2
 
-    # Right vertical forest strip
-    terrain[sq*4 : sq*12, sq*14 : sq*15] = 2
+    # Power plant & incinerator (flammable chaparral)
+    terrain[0:5, 17:22] = 1
+    terrain[0:5, 195:200] = 1
 
-    # ---------------------------------------------------------
-    # LAKES (light blue rectangles)
-    # ---------------------------------------------------------
-    # Upper horizontal lake
-    terrain[sq*7 : sq*8, sq*10 : sq*14] = 0
-
-    # Lower horizontal lake
-    terrain[sq*12 : sq*13, sq*6 : sq*16] = 0
-
-    # Vertical lake (middle)
-    terrain[sq*7 : sq*13, sq*12 : sq*13] = 0
-
-    # ---------------------------------------------------------
-    # CANYON (highly flammable scrubland)
-    # ---------------------------------------------------------
-    terrain[sq*5 : sq*16, sq*16 : sq*17] = 3
-
-    # ---------------------------------------------------------
-    # TOWN (small 2.5km × 2.5km black square)
-    # ---------------------------------------------------------
-    terrain[sq*1 : sq*2, sq*4 : sq*5] = 4
-
-    # ---------------------------------------------------------
-    # Ignition points (NO fire placed yet)
-    # ---------------------------------------------------------
-    # Power plant (top-left X)
-    power_plant = (sq*19, sq*1)
-
-    # Incinerator (top-right X)
-    incinerator = (sq*19, sq*19)
-
-    # ---------------------------------------------------------
-    # FIRE GRID (dynamic)
-    # ---------------------------------------------------------
+    # ============================================================
+    # FIRE GRID
+    # ============================================================
     fire = np.zeros((rows, cols), dtype=int)
+    fire[0:5, 17:22] = 5
+    fire[0:5, 195:200] = 5
 
-    # Start fire at power plant initially
-    fire[power_plant] = 1
+    # ============================================================
+    # BURN TIME GRID
+    # ============================================================
+    burn_time = np.zeros((rows, cols), dtype=float)
+    burn_time[0:5, 17:22] = 3
+    burn_time[0:5, 195:200] = 3
 
-    # Attach everything to the config
-    config.initial_grid = fire
+    # ============================================================
+    # INITIAL GRID FOR GUI (TERRAIN + FIRE OVERLAY)
+    # ============================================================
+    initial_vis = terrain.copy()
+    initial_vis[fire == 5] = 5  
+
+    config.initial_grid = initial_vis
     config.terrain_grid = terrain
-    config.power_plant = power_plant
-    config.incinerator = incinerator
+    config.fire_grid = fire
+    config.burn_time_grid = burn_time
 
+    if len(args) == 2:
+        config.save()
+        sys.exit()
 
-# ---------------------------------------------------------
-# TRANSITION FUNCTION
-# ---------------------------------------------------------
+    return config
+
 def transition_function(grid, neighbourstates, neighbourcounts):
-    """
-    Basic rule:
-    - burning -> burned out
-    - unburned -> burning if ANY neighbour is burning
-    - burned out -> stays burned out
+    
+    global config
+    terrain = config.terrain_grid
+    burn_time = config.burn_time_grid
+    fire = config.fire_grid
+    new_fire = fire.copy()
 
-    This is intentionally simple to give you a base to extend.
-    """
+    # Spread probability per terrain type
+    ignite_prob = {
+        1: 0.45,   # chaparral
+        2: 0.04,   # forest
+        3: 0.90,   # canyon
+        4: 0.50,   # town
+        5: 1.0,
+        6: 0.0,
+    }
 
-    new_grid = np.copy(grid)
+    # Burn durations
+    burn_duration = {
+        1: 25,
+        2: 60,
+        3: 10,
+        4: 40,
+    }
 
-    # Rule 1: burning -> burned out
-    burning_cells = (grid == 1)
-    new_grid[burning_cells] = 2
+    rows, cols = fire.shape
 
-    # Rule 2: unburned cells catch fire if ANY neighbour is burning
-    # neighbourcounts[1] = number of burning neighbours
-    unburned_cells = (grid == 0)
-    burning_neighbour = (neighbourcounts[1] > 0)
+    # Update burning cells
+    burning_mask = (fire == 5)
+    burn_time[burning_mask] -= 1
+    finished = burning_mask & (burn_time <= 0)
+    new_fire[finished] = 6  # burnt
 
-    ignite = unburned_cells & burning_neighbour
-    new_grid[ignite] = 1
+    # Spread fire
+    burning_cells = np.where(fire == 5)
+    for br, bc in zip(burning_cells[0], burning_cells[1]):
 
-    return new_grid
+        # Get all 8 neighbors
+        neighbors = [(dr, dc) for dr in [-1,0,1] for dc in [-1,0,1] if not (dr==0 and dc==0)]
+        for dr, dc in neighbors:
+            nr, nc = br + dr, bc + dc
+            if 0 <= nr < rows and 0 <= nc < cols:
 
+                # Skip lakes
+                if terrain[nr, nc] == 0 or new_fire[nr, nc] in (5, 6):
+                    continue
 
-# ---------------------------------------------------------
-# MAIN FUNCTION
-# ---------------------------------------------------------
+                terr = terrain[nr, nc]
+
+                # Probability catch fire
+                p = ignite_prob.get(terr, 0.1)
+                spread_prob = p
+
+                # Wind influence (if wind exists)
+                if hasattr(config, "wind_direction"):
+                    if config.wind_direction == "E" and dc > 0:
+                        spread_prob += 0.3
+                    elif config.wind_direction == "W" and dc < 0:
+                        spread_prob += 0.3
+                    elif config.wind_direction == "S" and dr > 0:
+                        spread_prob += 0.3
+                    elif config.wind_direction == "N" and dr < 0:
+                        spread_prob += 0.3
+
+                # Attempt to ignite neighbor
+                if np.random.rand() < spread_prob:
+                    new_fire[nr, nc] = 5
+                    burn_time[nr, nc] = burn_duration.get(terr, 15)
+
+    # -----------------------------
+    # Update visual grid
+    # -----------------------------
+    out = terrain.copy()
+    out[new_fire == 5] = 5
+    out[new_fire == 6] = 6
+    config.fire_grid = new_fire
+
+    return out
+
 def main():
-    """
-    Runs when the model is executed (python fire_model.py).
-    CAPyLE calls this automatically when running through the GUI.
-    """
-
-    config = CAConfig(sys.argv)
-    setup(config)
-
-    # Run CA with simple transition function
+    global config
+    config = setup(sys.argv[1:])
     grid = Grid2D(config, transition_function)
     timeline = grid.run()
 
-    return timeline
+    config.save()
+    utils.save(timeline, config.timeline_path)
 
 
-# Standard Python entry point
 if __name__ == "__main__":
     main()
