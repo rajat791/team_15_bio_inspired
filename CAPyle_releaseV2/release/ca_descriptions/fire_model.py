@@ -175,6 +175,9 @@ def transition_function(grid, neighbourstates, neighbourcounts):
                 if config.initial_grid[nr, nc] == 3 and config.initial_grid[br, bc] != 3:
                     # Lower the probability of spread if the neighbor is in a canyon and this tile is on the mainland
                     spread_prob *= 0.0002
+                elif config.initial_grid[nr, nc] != 3 and config.initial_grid[br, bc] == 3:
+                    # Lower the probability of spread if the neighbor is on mainland and this tile is in a canyon
+                    spread_prob *= 0.0003
                 else:
                     # Humidity is higher near lakes, reducing the fire spread probability
                     humidity_factor = 0
