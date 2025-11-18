@@ -18,6 +18,33 @@ sys.path.append(main_dir_loc + 'capyle/guicomponents')
 from capyle.ca import Grid2D
 import capyle.utils as utils
 
+neighbors = [(dr, dc) for dr in [-1,0,1] for dc in [-1,0,1] if not (dr==0 and dc==0)]
+
+# Fire spread probability per terrain type
+ignite_prob = {
+    1: 0.45,   # chaparral
+    2: 0.04,   # forest
+    3: 0.90,   # canyon
+    4: 0.50,   # town
+    5: 1.0,
+    6: 0.0,
+}
+
+# Burn durations
+burn_duration = {
+    1: 25,
+    2: 60,
+    3: 10,
+    4: 40,
+}
+
+# Vegetation regrowth probability per terrain type
+veg_spread_prob = {
+    1: 0.01,
+    2: 0.0002,
+    3: 0.01
+}
+
 def setup(args):
     global config
     config_path = args[0]
@@ -100,57 +127,14 @@ def setup(args):
 
     return config
 
-def transition_function(grid, neighbourstates, neighbourcounts):
-    
-    global config
-    terrain = config.terrain_grid
-    burn_time = config.burn_time_grid
-    fire = config.fire_grid
-    new_fire = fire.copy()
-
-    # Fire spread probability per terrain type
-    ignite_prob = {
-        1: 0.45,   # chaparral
-        2: 0.04,   # forest
-        3: 0.90,   # canyon
-        4: 0.50,   # town
-        5: 1.0,
-        6: 0.0,
-    }
-
-    # Burn durations
-    burn_duration = {
-        1: 25,
-        2: 60,
-        3: 10,
-        4: 40,
-    }
-
-    # Vegetation regrowth probability per terrain type
-    veg_spread_prob = {
-        1: 0.01,
-        2: 0.0002,
-        3: 0.01
-    }
-
-    rows, cols = fire.shape
-
-    # Update burning cells
-    burning_mask = (fire == 5)
-    burn_time[burning_mask] -= 1
-    finished = burning_mask & (burn_time <= 0)
-    new_fire[finished] = 6  # burnt
-
+def spread_fire(terrain, fire, new_fire, burn_time):
     # Spread fire
+    rows, cols = terrain.shape
     burning_cells = np.where(fire == 5)
     for br, bc in zip(burning_cells[0], burning_cells[1]):
-
-        # Get all 8 neighbors
-        neighbors = [(dr, dc) for dr in [-1,0,1] for dc in [-1,0,1] if not (dr==0 and dc==0)]
         for dr, dc in neighbors:
             nr, nc = br + dr, bc + dc
             if 0 <= nr < rows and 0 <= nc < cols:
-
                 # Skip lakes
                 if terrain[nr, nc] == 0 or new_fire[nr, nc] in (5, 6):
                     continue
@@ -181,8 +165,7 @@ def transition_function(grid, neighbourstates, neighbourcounts):
                 else:
                     # Humidity is higher near lakes, reducing the fire spread probability
                     humidity_factor = 0
-                    surrounds = [(sr, sc) for sr in [-1,0,1] for sc in [-1,0,1] if not (sr==0 and sc==0)]
-                    for sr, sc in surrounds:
+                    for sr, sc in neighbors:
                         r, c = sr + nr, sc + nc
                         if 0 <= r < rows and 0 <= c < cols and terrain[r, c] == 0:
                             humidity_factor += 1
@@ -196,11 +179,10 @@ def transition_function(grid, neighbourstates, neighbourcounts):
                     new_fire[nr, nc] = 5
                     burn_time[nr, nc] = burn_duration.get(terr, 15)
 
-    # Spread vegetation
+def spread_vegetation(terrain, new_fire, burn_time):
+    rows, cols = terrain.shape
     veg_cells = np.where((terrain >= 1) ^ (terrain > 3))
     for br, bc in zip(veg_cells[0], veg_cells[1]):
-        # Get all 8 neighbors
-        neighbors = [(dr, dc) for dr in [-1,0,1] for dc in [-1,0,1] if not (dr==0 and dc==0)]
         for dr, dc in neighbors:
             nr, nc = br + dr, bc + dc
             if 0 <= nr < rows and 0 <= nc < cols:
@@ -216,6 +198,23 @@ def transition_function(grid, neighbourstates, neighbourcounts):
                     terrain[nr, nc] = terrain[br, bc]
                     new_fire[nr, nc] = 0
                     burn_time[nr, nc] = 0
+
+def transition_function(grid, neighbourstates, neighbourcounts):
+    global config
+    terrain = config.terrain_grid
+    burn_time = config.burn_time_grid
+    fire = config.fire_grid
+    new_fire = fire.copy()
+
+    # Update burning cells
+    burning_mask = (fire == 5)
+    burn_time[burning_mask] -= 1
+    finished = burning_mask & (burn_time <= 0)
+    new_fire[finished] = 6  # burnt
+
+    # Update the map
+    spread_fire(terrain, fire, new_fire, burn_time)
+    spread_vegetation(terrain, new_fire, burn_time)
 
     # -----------------------------
     # Update visual grid
