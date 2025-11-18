@@ -181,7 +181,7 @@ def spread_fire(terrain, fire, new_fire, burn_time):
 
 def spread_vegetation(terrain, new_fire, burn_time):
     rows, cols = terrain.shape
-    veg_cells = np.where((terrain >= 1) ^ (terrain > 3))
+    veg_cells = np.where((terrain >= 1) & (terrain <= 3))
     for br, bc in zip(veg_cells[0], veg_cells[1]):
         for dr, dc in neighbors:
             nr, nc = br + dr, bc + dc
@@ -200,7 +200,6 @@ def spread_vegetation(terrain, new_fire, burn_time):
                     burn_time[nr, nc] = 0
 
 def transition_function(grid, neighbourstates, neighbourcounts):
-    global config
     terrain = config.terrain_grid
     burn_time = config.burn_time_grid
     fire = config.fire_grid
