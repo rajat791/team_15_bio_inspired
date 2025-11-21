@@ -91,6 +91,13 @@ def setup(args):
     terrain[20:100, 20:50] = 2
     terrain[100:140, 20:100] = 2
     terrain[20:30, 50:80] = 2
+    terrain[100:140, 100:130] = 2 
+    terrain[20:140, 0:20] = 2
+    terrain[140:190, 20:45] = 2
+    terrain[140:190, 75:90] = 2
+    terrain[140:165,45:75] = 2
+    
+
 
     # Power plant & incinerator (flammable chaparral)
     terrain[0:5, 17:22] = 1
