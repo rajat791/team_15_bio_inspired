@@ -45,6 +45,7 @@ veg_spread_prob = {
     3: 0.01
 }
 
+
 def setup(args):
     global config
     config_path = args[0]
@@ -67,7 +68,7 @@ def setup(args):
     ]
 
     # Wind
-    config.wind_direction = "SE"
+    config.wind_direction = "N"
     config.wind_strength = 5.0
     
     # Wind direction 
@@ -174,7 +175,7 @@ def spread_fire(terrain, fire, new_fire, burn_time):
                 if alignment > 0:
                     spread_prob *= (1 + config.wind_strength * alignment)
                 elif alignment < 0:
-                    spread_prob *= (1 + (alignment*0.6) * (config.wind_strength * 0.4))
+                    spread_prob *= (1 + (alignment*0.55) * (config.wind_strength * 0.4))
 
                 if config.initial_grid[nr, nc] == 3 and config.initial_grid[br, bc] != 3:
                     # Lower the probability of spread if the neighbor is in a canyon and this tile is on the mainland

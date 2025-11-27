@@ -45,6 +45,35 @@ veg_spread_prob = {
     3: 0.01
 }
 
+# Water drop pattern
+water_drop_pos = [
+    [0, 179], [1, 179],
+    [2, 179], [3, 179],
+    [4, 179], [5, 179],
+    [6, 179], [7, 179],
+    [8, 179], [9, 179],
+    [10, 179], [11, 179],
+    [12, 179], [13, 179],
+    [14, 179], [15, 179],
+    [16, 179], [17, 179],
+    [18, 179], [19, 179],
+    [20, 179], [21, 179],
+    [22, 179], [23, 179],
+    [24, 179], [25, 179],
+    [25, 180], [25, 181],
+    [25, 182], [25, 183],
+    [25, 184], [25, 185],
+    [25, 186], [25, 187],
+    [25, 188], [25, 189],
+    [25, 190], [25, 191],
+    [25, 192], [25, 193],
+    [25, 194], [25, 195],
+    [25, 196], [25, 197],
+    [25, 198], [25, 199],
+    [25, 199], [25, 199],
+    [25, 199], [25, 199]
+]
+
 def setup(args):
     global config
     config_path = args[0]
@@ -67,7 +96,7 @@ def setup(args):
     ]
 
     # Wind
-    config.wind_direction = "SE"
+    config.wind_direction = "N"
     config.wind_strength = 5.0
     
     # Wind direction 
@@ -134,6 +163,7 @@ def setup(args):
     config.terrain_grid = terrain
     config.fire_grid = fire
     config.burn_time_grid = burn_time
+    config.water_drop_remaining = 50
 
     if len(args) == 2:
         config.save()
@@ -174,7 +204,7 @@ def spread_fire(terrain, fire, new_fire, burn_time):
                 if alignment > 0:
                     spread_prob *= (1 + config.wind_strength * alignment)
                 elif alignment < 0:
-                    spread_prob *= (1 + (alignment*0.6) * (config.wind_strength * 0.4))
+                    spread_prob *= (1 + (alignment*0.55) * (config.wind_strength * 0.4))
 
                 if config.initial_grid[nr, nc] == 3 and config.initial_grid[br, bc] != 3:
                     # Lower the probability of spread if the neighbor is in a canyon and this tile is on the mainland
@@ -234,6 +264,15 @@ def transition_function(grid, neighbourstates, neighbourcounts):
     # Update the map
     spread_fire(terrain, fire, new_fire, burn_time)
     spread_vegetation(terrain, new_fire, burn_time)
+
+    # Put out fires using 50 available tiles (12.5km^2)
+    for i in range(0,3):
+        if config.water_drop_remaining > 0:
+            pr, pc = water_drop_pos[len(water_drop_pos) - config.water_drop_remaining]
+            config.water_drop_remaining -= 1
+            terrain[pr, pc] = 0
+            new_fire[pr, pc] = 0
+            burn_time[pr, pc] = 0
 
     # -----------------------------
     # Update visual grid
