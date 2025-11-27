@@ -67,8 +67,22 @@ def setup(args):
     ]
 
     # Wind
-    config.wind_direction = "W"
+    config.wind_direction = "SE"
     config.wind_strength = 5.0
+    
+    # Wind direction 
+    wind_vectors = {
+        "N":  (-1,  0),
+        "NE": (-1,  1),
+        "E":  ( 0,  1),
+        "SE": ( 1,  1),
+        "S":  ( 1,  0),
+        "SW": ( 1, -1),
+        "W":  ( 0, -1),
+        "NW": (-1, -1),
+    }
+    
+    config.wind_vec = normalise(wind_vectors[config.wind_direction])
 
     # ============================================================
     # TERRAIN GRID
@@ -91,6 +105,13 @@ def setup(args):
     terrain[20:100, 20:50] = 2
     terrain[100:140, 20:100] = 2
     terrain[20:30, 50:80] = 2
+    terrain[100:140, 100:130] = 2 
+    terrain[20:140, 0:20] = 2
+    terrain[140:190, 20:45] = 2
+    terrain[140:190, 75:90] = 2
+    terrain[140:165,45:75] = 2
+    
+
 
     # Power plant & incinerator (flammable chaparral)
     terrain[0:5, 17:22] = 1
@@ -127,9 +148,18 @@ def setup(args):
 
     return config
 
+def normalise(vec):
+    x, y = vec
+    mag = np.sqrt(x*x + y*y)
+    if mag == 0:
+        return np.array([0.0, 0.0])
+    return np.array([x/mag, y/mag])
+
+
 def spread_fire(terrain, fire, new_fire, burn_time):
     # Spread fire
     rows, cols = terrain.shape
+    
     burning_cells = np.where(fire == 5)
     for br, bc in zip(burning_cells[0], burning_cells[1]):
         for dr, dc in neighbors:
@@ -142,19 +172,16 @@ def spread_fire(terrain, fire, new_fire, burn_time):
                 terr = terrain[nr, nc]
 
                 # Probability catch fire
-                p = ignite_prob.get(terr, 0.1)
-                spread_prob = p
+                spread_prob = ignite_prob.get(terr, 0.1)
 
-                # Wind influence (if wind exists)
-                if hasattr(config, "wind_direction"):
-                    if config.wind_direction == "E" and dc > 0:
-                        spread_prob += 0.3
-                    elif config.wind_direction == "W" and dc < 0:
-                        spread_prob += 0.3
-                    elif config.wind_direction == "S" and dr > 0:
-                        spread_prob += 0.3
-                    elif config.wind_direction == "N" and dr < 0:
-                        spread_prob += 0.3
+                direction_vec = normalise((dr, dc))
+                wind_vec = config.wind_vec
+                alignment = np.dot(wind_vec, direction_vec)
+
+                if alignment > 0:
+                    spread_prob *= (1 + config.wind_strength * alignment)
+                elif alignment < 0:
+                    spread_prob *= (1 + alignment * (config.wind_strength * 0.4))
 
                 if config.initial_grid[nr, nc] == 3 and config.initial_grid[br, bc] != 3:
                     # Lower the probability of spread if the neighbor is in a canyon and this tile is on the mainland
