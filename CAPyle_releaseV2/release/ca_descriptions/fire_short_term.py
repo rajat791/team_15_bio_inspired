@@ -82,7 +82,7 @@ def setup(args):
     config.dimensions = 2
     config.states = (0, 1, 2, 3, 4, 5, 6)
     config.grid_dims = (200, 200)
-    config.num_generations = 300
+    config.num_generations = 600
 
     # Colours
     config.state_colors = [
