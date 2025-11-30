@@ -18,6 +18,7 @@ sys.path.append(main_dir_loc + 'capyle/guicomponents')
 from capyle.ca import Grid2D
 import capyle.utils as utils
 
+# Define Moore neighborhood
 neighbors = [(dr, dc) for dr in [-1,0,1] for dc in [-1,0,1] if not (dr==0 and dc==0)]
 
 # Fire spread probability per terrain type
@@ -26,16 +27,16 @@ ignite_prob = {
     2: 0.04,   # forest
     3: 0.90,   # canyon
     4: 0.50,   # town
-    5: 1.0,
-    6: 0.0,
+    5: 1.0,    # burning cell
+    6: 0.0,    # burned cell
 }
 
-# Burn durations
+# Duration (in generations) that a burning cell continues to burn
 burn_duration = {
-    1: 25,
-    2: 60,
-    3: 10,
-    4: 40,
+    1: 25,  # chaparral
+    2: 60,  # forest
+    3: 10,  # canyon
+    4: 40,  # town
 }
 
 # Vegetation regrowth probability per terrain type
@@ -45,7 +46,7 @@ veg_spread_prob = {
     3: 0.01
 }
 
-# Water drop pattern
+# Water drop pattern around the incinerator 
 water_drop_pos = [
     [0, 179], [1, 179],
     [2, 179], [3, 179],
@@ -84,7 +85,7 @@ def setup(args):
     config.grid_dims = (200, 200)
     config.num_generations = 600
 
-    # Colours
+    # State colours for visualisation
     config.state_colors = [
         (0.2, 0.4, 1.0),  # 0 lake
         (0.95, 0.9, 0.3), # 1 chaparral
@@ -95,7 +96,7 @@ def setup(args):
         (0.4, 0.4, 0.4)   # 6 burned
     ]
 
-    # Wind
+    # Wind direction vectors (used to bias spread probabilities)
     config.wind_direction = "N"
     config.wind_strength = 5.0
     
@@ -111,6 +112,7 @@ def setup(args):
         "NW": (-1, -1),
     }
     
+    # Normalised vector for computational convenience
     config.wind_vec = normalise(wind_vectors[config.wind_direction])
 
     # ============================================================
@@ -176,6 +178,7 @@ def setup(args):
     return config
 
 def normalise(vec):
+    # Returns a normalised (unit length) vector for direction scaling.
     x, y = vec
     mag = np.sqrt(x*x + y*y)
     if mag == 0:
@@ -184,32 +187,34 @@ def normalise(vec):
 
 
 def spread_fire(terrain, fire, new_fire, burn_time):
-    # Spread fire
+    # Determine how active fires ignite neighbouring cells.
     rows, cols = terrain.shape
 
     burning_cells = np.where(fire == 5)
+    # Iterate over all burning cells and their 8 neighbors
     for br, bc in zip(burning_cells[0], burning_cells[1]):
         for dr, dc in neighbors:
             nr, nc = br + dr, bc + dc
             if 0 <= nr < rows and 0 <= nc < cols:
-                # Skip lakes
+                # Skip lakes and already burning/burned cells
                 if terrain[nr, nc] == 0 or new_fire[nr, nc] in (5, 6):
                     continue
 
                 terr = terrain[nr, nc]
 
-                # Probability catch fire
+                # Modify probability according to wind direction & strength
                 spread_prob = ignite_prob.get(terr, 0.1)
 
                 direction_vec = normalise((dr, dc))
                 wind_vec = config.wind_vec
                 alignment = np.dot(wind_vec, direction_vec)
-
+                # Wind boosting when aligned with direction
                 if alignment > 0:
                     spread_prob *= (1 + config.wind_strength * alignment)
+                # Reduced probability when opposite to wind
                 elif alignment < 0:
                     spread_prob *= (1 + (alignment*0.55) * (config.wind_strength * 0.4))
-
+                # Terrain transition adjustments (e.g., canyon boundaries)
                 if config.initial_grid[nr, nc] == 3 and config.initial_grid[br, bc] != 3:
                     # Lower the probability of spread if the neighbor is in a canyon and this tile is on the mainland
                     spread_prob *= 0.0002
@@ -254,18 +259,19 @@ def spread_vegetation(terrain, new_fire, burn_time):
                     burn_time[nr, nc] = 0
 
 def transition_function(grid, neighbourstates, neighbourcounts):
+    #Main update function applied at each generation step.
     terrain = config.terrain_grid
     burn_time = config.burn_time_grid
     fire = config.fire_grid
     new_fire = fire.copy()
 
-    # Update burning cells
+    # Decrease burn timers and mark finished fires as burned
     burning_mask = (fire == 5)
     burn_time[burning_mask] -= 1
     finished = burning_mask & (burn_time <= 0)
     new_fire[finished] = 6  # burnt
 
-    # Update the map
+    # Apply fire spread and vegetation processes
     spread_fire(terrain, fire, new_fire, burn_time)
     spread_vegetation(terrain, new_fire, burn_time)
 
