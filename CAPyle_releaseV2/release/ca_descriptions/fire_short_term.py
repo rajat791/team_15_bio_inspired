@@ -143,14 +143,18 @@ def setup(args):
     # FIRE GRID
     # ============================================================
     fire = np.zeros((rows, cols), dtype=int)
-    fire[0:5, 17:22] = 5
+    # fire[0:5, 17:22] = 5
+
+     #  Initialize fire only at the Incinerator
     fire[0:5, 195:200] = 5
 
     # ============================================================
     # BURN TIME GRID
     # ============================================================
     burn_time = np.zeros((rows, cols), dtype=float)
-    burn_time[0:5, 17:22] = 3
+
+    # burn_time[0:5, 17:22] = 3
+
     burn_time[0:5, 195:200] = 3
 
     # ============================================================
@@ -182,7 +186,7 @@ def normalise(vec):
 def spread_fire(terrain, fire, new_fire, burn_time):
     # Spread fire
     rows, cols = terrain.shape
-    
+
     burning_cells = np.where(fire == 5)
     for br, bc in zip(burning_cells[0], burning_cells[1]):
         for dr, dc in neighbors:
@@ -266,6 +270,7 @@ def transition_function(grid, neighbourstates, neighbourcounts):
     spread_vegetation(terrain, new_fire, burn_time)
 
     # Put out fires using 50 available tiles (12.5km^2)
+    # The water drop positions act as a barrier to the fire
     for i in range(0,3):
         if config.water_drop_remaining > 0:
             pr, pc = water_drop_pos[len(water_drop_pos) - config.water_drop_remaining]
